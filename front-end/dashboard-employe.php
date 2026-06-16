@@ -6,6 +6,49 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'employe') {
     header("Location: /projet/ticket/login"); 
     exit();
 }
+
+$userId = $_SESSION['user_id'];
+
+// =========================================================================
+// 1. STRATÉGIE DE LIEN DB : Récupération des métriques de l'employé connecté
+// =========================================================================
+
+// Tickets ouverts (statut 'Ouvert')
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE client_id = ? AND statut = 'Ouvert'");
+$stmt->execute([$userId]);
+$ticketsOuverts = $stmt->fetchColumn();
+
+// Tickets en cours (statut 'En cours')
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE client_id = ? AND statut = 'En cours'");
+$stmt->execute([$userId]);
+$ticketsEnCours = $stmt->fetchColumn();
+
+// Tickets résolus (statut 'Résolu')
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE client_id = ? AND statut = 'Résolu'");
+$stmt->execute([$userId]);
+$ticketsResolus = $stmt->fetchColumn();
+
+
+// =========================================================================
+// 2. STRATÉGIE DE LIEN DB : Récupération des 5 derniers tickets récents
+// =========================================================================
+$stmt = $pdo->prepare("SELECT * FROM tickets WHERE client_id = ? ORDER BY id DESC LIMIT 5");
+$stmt->execute([$userId]);
+$ticketsRecents = $stmt->fetchAll();
+
+// Correspondance entre les statuts/catégories SQL et tes classes CSS graphiques
+$statusClasses = [
+    'Ouvert' => 'st-open',
+    'En cours' => 'st-prog',
+    'Résolu' => 'st-done'
+];
+
+$catClasses = [
+    'Réseau' => 'cat-net',
+    'Matériel' => 'cat-hw',
+    'Logiciel' => 'cat-sw',
+    'Accès' => 'cat-acc'
+];
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -94,31 +137,67 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'employe') {
         <div class="sbi" style="color: #E24B4A;"><i class="ti ti-logout"></i>Déconnexion</div>
       </a>
     </div>
+
     <div class="main">
       <div class="topbar">
-        <span class="tb-title">Bonjour, <?php echo htmlspecialchars($_SESSION['nom'] ?? 'Utilisateur'); ?> 👋</span>
+        <span class="tb-title">Bonjour, <?= htmlspecialchars($_SESSION['nom'] ?? 'Utilisateur'); ?> 👋</span>
         <div class="tb-right">
           <i class="ti ti-bell" style="font-size:18px;color:#6b7280;cursor:pointer;"></i>
-          <div class="av"><?php echo strtoupper(substr($_SESSION['nom'] ?? 'U', 0, 2)); ?></div>
-          <span style="font-size:13px;color:#1e2a3a"><?php echo htmlspecialchars($_SESSION['nom'] ?? 'Utilisateur'); ?></span>
+          <div class="av"><?= strtoupper(substr($_SESSION['nom'] ?? 'U', 0, 2)); ?></div>
+          <span style="font-size:13px;color:#1e2a3a"><?= htmlspecialchars($_SESSION['nom'] ?? 'Utilisateur'); ?></span>
         </div>
       </div>
+
       <div class="body">
         <div class="metrics">
-          <div class="mc"><div class="mc-l">Tickets ouverts</div><div class="mc-v">3</div><div class="mc-s" style="color:#A32D2D">2 en attente</div></div>
-          <div class="mc"><div class="mc-l">En cours</div><div class="mc-v">1</div><div class="mc-s" style="color:#185FA5">Technicien assigné</div></div>
-          <div class="mc"><div class="mc-l">Résolus ce mois</div><div class="mc-v">7</div><div class="mc-s" style="color:#0F6E56">Fermés</div></div>
-          <div class="mc"><div class="mc-l">Délai moyen</div><div class="mc-v">4h</div><div class="mc-s" style="color:#6b7280">Résolution</div></div>
+          <div class="mc">
+            <div class="mc-l">Tickets ouverts</div>
+            <div class="mc-v"><?= $ticketsOuverts; ?></div>
+            <div class="mc-s" style="color:#A32D2D">En attente</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">En cours</div>
+            <div class="mc-v"><?= $ticketsEnCours; ?></div>
+            <div class="mc-s" style="color:#185FA5">Pris en charge</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Résolus</div>
+            <div class="mc-v"><?= $ticketsResolus; ?></div>
+            <div class="mc-s" style="color:#0F6E56">Fermés</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Délai moyen</div>
+            <div class="mc-v">4h</div> <div class="mc-s" style="color:#6b7280">Résolution</div>
+          </div>
         </div>
+
         <div class="row2">
           <div class="card">
             <div class="ch">Mes tickets récents</div>
-            <div class="trow"><span class="tid">#T-0041</span><span class="tdesc">Impossible de se connecter au VPN</span><span class="tcat cat-net">Réseau</span><span class="tst st-prog">En cours</span></div>
-            <div class="trow"><span class="tid">#T-0038</span><span class="tdesc">Écran bleu au démarrage</span><span class="tcat cat-hw">Matériel</span><span class="tst st-open">Ouvert</span></div>
-            <div class="trow"><span class="tid">#T-0035</span><span class="tdesc">Mise à jour Office bloquée</span><span class="tcat cat-sw">Logiciel</span><span class="tst st-open">Ouvert</span></div>
-            <div class="trow"><span class="tid">#T-0029</span><span class="tdesc">Réinitialisation mot de passe AD</span><span class="tcat cat-acc">Accès</span><span class="tst st-done">Résolu</span></div>
-            <div class="trow"><span class="tid">#T-0022</span><span class="tdesc">Imprimante réseau introuvable</span><span class="tcat cat-net">Réseau</span><span class="tst st-done">Résolu</span></div>
+            
+            <?php if (empty($ticketsRecents)): ?>
+                <div style="text-align: center; padding: 20px; color: #6b7280;">
+                    Vous n'avez pas encore créé de tickets.
+                </div>
+            <?php else: ?>
+                <?php foreach ($ticketsRecents as $ticket): 
+                    // Sécurité d'affichage si l'IA n'a pas encore écrit la catégorie
+                    $catName = $ticket['categorie'] ?? 'Analyse...';
+                    $catClass = $catClasses[$catName] ?? 'cat-sw'; 
+                    
+                    $stName = $ticket['statut'] ?? 'Ouvert';
+                    $stClass = $statusClasses[$stName] ?? 'st-open';
+                ?>
+                    <div class="trow">
+                        <span class="tid">#T-<?= str_pad($ticket['id'], 4, '0', STR_PAD_LEFT); ?></span>
+                        <span class="tdesc"><?= htmlspecialchars($ticket['titre']); ?></span>
+                        <span class="tcat <?= $catClass; ?>"><?= htmlspecialchars($catName); ?></span>
+                        <span class="tst <?= $stClass; ?>"><?= htmlspecialchars($stName); ?></span>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
           </div>
+
           <div class="card">
             <div class="ch">Nouveau ticket</div>
             <div class="fg">
@@ -132,10 +211,10 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'employe') {
             <div class="fg">
               <label class="flabel" for="tprio">Priorité</label>
               <select id="tprio">
-                <option>Faible</option>
-                <option selected>Normale</option>
-                <option>Haute</option>
-                <option>Urgente</option>
+                <option value="Faible">Faible</option>
+                <option value="Normale" selected>Normale</option>
+                <option value="Haute">Haute</option>
+                <option value="Urgente">Urgente</option>
               </select>
             </div>
             <div class="ai-hint"><i class="ti ti-cpu" style="font-size:14px"></i>L'IA va catégoriser et assigner ce ticket automatiquement</div>
@@ -145,6 +224,40 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'employe') {
       </div>
     </div>
   </div>
+
+  <script>
+    document.querySelector('.sbtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+
+      const obj = document.getElementById('tobj').value;
+      const desc = document.getElementById('tdesc2').value;
+      const prio = document.getElementById('tprio').value;
+
+      if (!obj || !desc) {
+        alert("Veuillez remplir l'objet et la description.");
+        return;
+      }
+
+      try {
+        const response = await fetch('/projet/ticket/api/ticket/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ titre: obj, description: desc, priorite: prio })
+        });
+
+        const res = await response.json();
+        
+        if (response.ok) {
+          alert("Ticket créé avec succès !");
+          location.reload(); // Recharge la page PHP pour voir le nouveau ticket s'afficher en haut !
+        } else {
+          alert("Erreur : " + res.message);
+        }
+      } catch (err) {
+        alert("Impossible de joindre le serveur.");
+      }
+    });
+  </script>
 </body>
 <script type="module" src="/projet/ticket/front-end/createTicket.js"></script>
 </html>
