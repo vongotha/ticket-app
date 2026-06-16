@@ -69,22 +69,3 @@ CREATE TABLE `notifications` (
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
-
--- ========================================================
--- INJECTION DE DONNÉES DE BASE (SEEDERS)
--- ========================================================
-
--- Insertion des catégories par défaut pour l'IA
-INSERT INTO `categories` (`nom`, `description`) VALUES
-('Reseau', 'Problèmes de connexion Wifi, VPN, câbles ou coupures'),
-('Materiel', 'Panne de PC, écran noir, souris, imprimante défectueuse'),
-('Logiciel / Application', 'Bug sur le portail, problème d''accès aux logiciels internes'),
-('Securite', 'Compte bloqué, suspicion de phishing, perte de mot de passe');
-
--- Insertion de comptes de test (Le mot de passe pour tous est : 'password123')
--- Note : En production/démo, ces hashs correspondent à 'password123' via PASSWORD_BCRYPT
-INSERT INTO `users` (`nom`, `email`, `password`, `role`) VALUES
-('Tech Réseau', 'tech.reseau@entreprise.com', '$2y$10$tMvB6N0yK2mOnG8BvS9I6uLhVwX7E6XbK3YV9H5S4q9W8e7r6t5y.', 'technicien'),
-('Tech Matériel', 'tech.materiel@entreprise.com', '$2y$10$tMvB6N0yK2mOnG8BvS9I6uLhVwX7E6XbK3YV9H5S4q9W8e7r6t5y.', 'technicien'),
-('Gisèle Employée', 'gisele@entreprise.com', '$2y$10$tMvB6N0yK2mOnG8BvS9I6uLhVwX7E6XbK3YV9H5S4q9W8e7r6t5y.', 'employe');

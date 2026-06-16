@@ -2,4 +2,4 @@ RewriteEngine On
 # Si le fichier ou dossier n'existe pas, renvoyer vers index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.php [QSA,L]
+RewriteRule ^(.*)$ index.php [QSA,L]
