@@ -1,8 +1,13 @@
 <?php
-
+<?php
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
+// CORRECTION : On démarre la session au tout début du cycle de vie de la requête
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 header("Content-Type: application/json");
 require_once 'config/database.php';

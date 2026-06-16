@@ -10,33 +10,33 @@ class AuthController {
             return;
         }
 
-        // 1. Chercher l'utilisateur par email
         $stmt = $pdo->prepare("SELECT id, nom, password, role FROM users WHERE email = ?");
         $stmt->execute([$data['email']]);
         $user = $stmt->fetch();
 
-        // 2. Vérifier si l'utilisateur existe ET si le hash correspond
         if ($user && password_verify($data['password'], $user['password'])) {
 
-            // Connexion réussie, on renvoie les données pour le Frontend
+            // 1. ON ENREGISTRE LA SESSION D'ABORD (Impératif avant le echo !)
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['role'] = $user['role'];
+
+            // 2. ENVOI DE LA REPONSE JSON ENSUITE
             http_response_code(200);
             echo json_encode([
                 "status" => "success",
                 "user" => [
                     "id" => $user['id'],
                     "nom" => $user['nom'],
-                    "role" => $user['role'] // Important pour que le front sache s'il affiche le dashboard tech ou employe
+                    "role" => $user['role']
                 ]
             ]);
-
-            // Si le mot de passe est bon :
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['role'] = $user['role'];
+            return;
+            
         } else {
-            http_response_code(401); // Unauthorized
+            http_response_code(401);
             echo json_encode(["error" => "Email ou mot de passe incorrect."]);
         }
     }

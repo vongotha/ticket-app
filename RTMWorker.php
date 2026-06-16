@@ -26,9 +26,9 @@ while (true) {
                 // ... ton code d'insertion en base ...
                 echo "Ticket traité: $subject\n";
             } else {
-                echo "Mail ignoré (spam/newsletter): $subject\n";
+                echo "Mail ignoré (spam/newsletter)\n";
                 // Optionnel : Marquer comme lu pour ne plus qu'il revienne
-                imap_setflag_full($inbox, $email_number, "\\Seen");
+                //imap_setflag_full($inbox, $email_number, "\\Seen");
             }
         }
     }
