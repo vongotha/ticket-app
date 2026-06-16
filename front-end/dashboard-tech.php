@@ -1,7 +1,8 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'technicien') {
-    header("Location: login.php");
+
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'technicien') { // (ou 'technicien' / 'admin')
+    header("Location: /projet/ticket/login"); 
     exit();
 }
 ?>
@@ -161,7 +162,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'technicien') {
       </div>
     </div>
   </div>
-  <script type="module" src="chargerTicket.js"></script>
+  <script type="module" src="/projet/ticket/front-end/chargerTicket.js"></script>
   <script>
     function selectTicket(el) {
       document.querySelectorAll('.trow').forEach(r => r.classList.remove('sel'));

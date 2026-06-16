@@ -72,7 +72,7 @@
       <button class="sbtn" id="login-btn">Se connecter</button>
     </div>
   </div>
-  <script type="module" src="login.js"></script>
+  <script type="module" src="/projet/ticket/front-end/login.js"></script>
   <script>
     function setR(el) {
       document.querySelectorAll('.rbtn').forEach(b => b.classList.remove('active'));

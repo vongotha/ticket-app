@@ -1,7 +1,9 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+//Utiliser la route propre du routeur /projet/ticket/login
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'employe') {
-    header("Location: login.php"); // Expulsion vers le login
+    header("Location: /projet/ticket/login"); 
     exit();
 }
 ?>
@@ -141,5 +143,5 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'employe') {
     </div>
   </div>
 </body>
-<script type="module" src="createTicket.js"></script>
+<script type="module" src="/projet/ticket/front-end/createTicket.js"></script>
 </html>
