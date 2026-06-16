@@ -99,6 +99,9 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'technicien') { // (ou
       <div class="sb-sec">Compte</div>
       <div class="sbi"><i class="ti ti-bell"></i>Notifications</div>
       <div class="sbi"><i class="ti ti-user"></i>Mon profil</div>
+      <a href="/projet/ticket/logout" style="text-decoration: none;">
+        <div class="sbi" style="color: #E24B4A;"><i class="ti ti-logout"></i>Déconnexion</div>
+      </a>
     </div>
     <div class="main">
       <div class="topbar">

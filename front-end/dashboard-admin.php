@@ -98,6 +98,9 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') { // (ou 'tec
       <div class="sbi"><i class="ti ti-cpu"></i>Modèle IA</div>
       <div class="sbi"><i class="ti ti-chart-bar"></i>Rapports</div>
       <div class="sbi"><i class="ti ti-settings"></i>Paramètres</div>
+      <a href="/projet/ticket/logout" style="text-decoration: none;">
+        <div class="sbi" style="color: #E24B4A;"><i class="ti ti-logout"></i>Déconnexion</div>
+      </a>
     </div>
     <div class="main">
       <div class="topbar">
