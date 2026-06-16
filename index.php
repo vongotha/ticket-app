@@ -76,6 +76,37 @@ switch ($route) {
             echo json_encode(["message" => "Méthode non autorisée. Utilisez POST."]);
         }
         break;
+    case '/api/ticket/details':
+            header("Content-Type: application/json");
+            $ticketId = $_GET['id'] ?? 0;
+            
+            // Récupérer le ticket combiné avec le nom de l'utilisateur qui l'a créé
+            $stmt = $pdo->prepare("SELECT t.*, u.nom AS client_nom FROM tickets t LEFT JOIN users u ON t.client_id = u.id WHERE t.id = ?");
+            $stmt->execute([$ticketId]);
+            $ticket = $stmt->fetch();
+            
+            if ($ticket) {
+                echo json_encode($ticket);
+            } else {
+                http_response_code(404);
+                echo json_encode(["message" => "Ticket introuvable"]);
+            }
+        break;
+
+    case '/api/ticket/resolve':
+            header("Content-Type: application/json");
+            if ($requestMethod === 'POST') {
+                $data = json_decode(file_get_contents('php://input'), true);
+                
+                // On passe le statut à 'Résolu' et on enregistre la note de fin
+                $stmt = $pdo->prepare("UPDATE tickets SET statut = 'Résolu', note_resolution = ? WHERE id = ?");
+                $stmt->execute([$data['resolution'], $data['id']]);
+                
+                echo json_encode(["status" => "success", "message" => "Ticket clos"]);
+            } else {
+                http_response_code(405);
+            }
+        break;
 
     case '/api/ticket/create':
         header("Content-Type: application/json");
@@ -93,20 +124,20 @@ switch ($route) {
         break;
 
     case '/api/notifications/unread':
-        header("Content-Type: application/json");
-        $userId = $_SESSION['user_id'] ?? 0; 
-        $stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? AND est_lu = 0");
-        $stmt->execute([$userId]);
-        $notifs = $stmt->fetchAll();
-        echo json_encode(["data" => $notifs]);
+            header("Content-Type: application/json");
+            $userId = $_SESSION['user_id'] ?? 0; 
+            $stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? AND est_lu = 0");
+            $stmt->execute([$userId]);
+            $notifs = $stmt->fetchAll();
+            echo json_encode(["data" => $notifs]);
         break;
 
     case '/api/notifications/mark-read':
-        header("Content-Type: application/json");
-        $data = json_decode(file_get_contents('php://input'), true);
-        $stmt = $pdo->prepare("UPDATE notifications SET est_lu = 1 WHERE id = ?");
-        $stmt->execute([$data['id']]);
-        echo json_encode(["status" => "ok"]);
+            header("Content-Type: application/json");
+            $data = json_decode(file_get_contents('php://input'), true);
+            $stmt = $pdo->prepare("UPDATE notifications SET est_lu = 1 WHERE id = ?");
+            $stmt->execute([$data['id']]);
+            echo json_encode(["status" => "ok"]);
         break;
 
     case '/api/ticket/analyze':
@@ -114,6 +145,26 @@ switch ($route) {
         http_response_code(202); 
         echo json_encode(["message" => "Ticket reçu. Analyse IA en cours..."]);
         break;
+
+    case '/logout':
+    // 1. On vide toutes les variables de session
+    $_SESSION = array();
+
+    // 2. On détruit le cookie de session dans le navigateur
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+            $params["path"], $params["domain"],
+            $params["secure"], $params["httponly"]
+        );
+    }
+
+    // 3. On détruit la session sur le serveur
+    session_destroy();
+
+    // 4. On redirige proprement vers la ROUTE de login (sans .php)
+    header("Location: /projet/ticket/login");
+    exit();
 
     default:
         // Si aucune route ne correspond (Web ou API)
