@@ -69,3 +69,15 @@ CREATE TABLE `notifications` (
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+-- ========================================================
+-- TABLE : MAILS en attentes (Pour le système email de la partie SMTP)
+-- ========================================================
+CREATE TABLE IF NOT EXISTS mail_queue (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ticket_id INT,
+    destinataire_email VARCHAR(255),
+    sujet VARCHAR(255),
+    message TEXT,
+    statut ENUM('en_attente', 'envoye', 'erreur') DEFAULT 'en_attente',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;

@@ -94,32 +94,163 @@ switch ($route) {
         break;
 
     case '/api/ticket/resolve':
-            header("Content-Type: application/json");
-            if ($requestMethod === 'POST') {
-                $data = json_decode(file_get_contents('php://input'), true);
+        header("Content-Type: application/json");
+        if ($requestMethod === 'POST') {
+            $data = json_decode(file_get_contents('php://input'), true);
+            $ticketId = $data['id'] ?? 0;
+            $resolutionNote = $data['resolution'] ?? 'Aucune note';
+            
+            // 1. Mise à jour du ticket
+            $stmt = $pdo->prepare("UPDATE tickets SET statut = 'Résolu', note_resolution = ? WHERE id = ?");
+            $stmt->execute([$resolutionNote, $ticketId]);
+            
+            // 2. Récupérer l'email de l'employé (le client)
+            $stmtEmail = $pdo->prepare("SELECT u.email FROM users u JOIN tickets t ON u.id = t.client_id WHERE t.id = ?");
+            $stmtEmail->execute([$ticketId]);
+            $clientEmail = $stmtEmail->fetchColumn();
+            
+            // 3. Insérer dans la file d'attente pour informer l'employé
+            if ($clientEmail) {
+                $sujet = "Ticket #{$ticketId} Résolu";
+                $message = "Bonjour, votre ticket a été résolu. Note du technicien : " . $resolutionNote;
                 
-                // On passe le statut à 'Résolu' et on enregistre la note de fin
-                $stmt = $pdo->prepare("UPDATE tickets SET statut = 'Résolu', note_resolution = ? WHERE id = ?");
-                $stmt->execute([$data['resolution'], $data['id']]);
-                
-                echo json_encode(["status" => "success", "message" => "Ticket clos"]);
-            } else {
-                http_response_code(405);
+                $stmtMail = $pdo->prepare("INSERT INTO mail_queue (ticket_id, destinataire_email, sujet, message) VALUES (?, ?, ?, ?)");
+                $stmtMail->execute([$ticketId, $clientEmail, $sujet, $message]);
             }
+            
+            echo json_encode(["status" => "success", "message" => "Ticket clos et email de notification en file d'attente."]);
+        } else {
+            http_response_code(405);
+            echo json_encode(["message" => "Méthode non autorisée"]);
+        }
         break;
 
     case '/api/ticket/create':
         header("Content-Type: application/json");
         if ($requestMethod === 'POST') {
             $data = json_decode(file_get_contents('php://input'), true);
-            $clientId = $_SESSION['user_id'] ?? 1; // Sécurité de repli
+            $clientId = $_SESSION['user_id'] ?? 1;
             
-            $stmt = $pdo->prepare("INSERT INTO tickets (titre, description, client_id, provenance) VALUES (?, ?, ?, 'web')");
-            $stmt->execute([$data['titre'], $data['description'], $clientId]);
-            echo json_encode(["message" => "Ticket créé avec succès"]);
+            $titre = $data['titre'] ?? '';
+            $description = $data['description'] ?? '';
+            $priorite = $data['priorite'] ?? 'Normale';
+
+            // ==========================================
+            // 1. INTERROGER L'IA (Serveur Python)
+            // ==========================================
+            $url_api_ia = 'http://127.0.0.1:5000/predict'; // Utilise l'IP directement
+            $data_to_send = json_encode(['description' => $description]);
+
+            $ch = curl_init($url_api_ia);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $data_to_send);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5); // Timeout de 5s pour laisser le temps au modèle
+
+            error_log("[PHP-DEBUG] Envoi vers IA : " . $data_to_send);
+
+            // On exécute la requête vers l'IA
+            $response = curl_exec($ch);
+            
+            // On vérifie les erreurs réseau (ex: Python éteint)
+            if (curl_errno($ch)) {
+                $error_msg = curl_error($ch);
+                curl_close($ch);
+                http_response_code(500);
+                echo json_encode(["message" => "Erreur de connexion à l'IA : " . $error_msg]);
+                exit;
+            }
+
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            // Valeurs par défaut si l'IA ne répond pas proprement
+            $categorie_predite = 'Logiciel'; 
+            $score_ia = null;
+
+            if ($http_code === 200 && $response) {
+                $result_ia = json_decode($response, true);
+                error_log("[PHP-DEBUG] Réponse reçue de l'IA : " . print_r($result_ia, true));
+
+                if (isset($result_ia['status']) && $result_ia['status'] === 'success') {
+                    $categorie_predite = $result_ia['categorie'];
+                    $score_ia = $result_ia['score_ia'];
+                }
+            }
+
+            // ==========================================
+            // LOGIQUE BDD : ASSIGNATION & INSERTION
+            // ==========================================
+            try {
+                // 2. LOGIQUE D'ASSIGNATION AUTOMATIQUE
+                // Chercher un technicien avec la spécialité correspondant à la prédiction
+                $stmtTech = $pdo->prepare("SELECT id FROM users WHERE role = 'technicien' AND specialite = ? LIMIT 1");
+                $stmtTech->execute([$categorie_predite]);
+                $technicienId = $stmtTech->fetchColumn();
+
+                // Fallback: Si aucun technicien spécialisé n'est trouvé, on prend le premier dispo
+                if (!$technicienId) {
+                    $stmtFallback = $pdo->prepare("SELECT id FROM users WHERE role = 'technicien' LIMIT 1");
+                    $stmtFallback->execute();
+                    $technicienId = $stmtFallback->fetchColumn() ?: null;
+                }
+
+                // 3. INSERTION DU TICKET EN BASE
+                $stmt = $pdo->prepare("
+                    INSERT INTO tickets (titre, description, client_id, technicien_id, provenance, categorie, score_ia, priorite, statut) 
+                    VALUES (?, ?, ?, ?, 'web', ?, ?, ?, 'Nouveau')
+                ");
+                $stmt->execute([
+                    $titre, 
+                    $description, 
+                    $clientId, 
+                    $technicienId, 
+                    $categorie_predite, 
+                    $score_ia, 
+                    $priorite
+                ]);
+                
+                // Récupération de l'ID du ticket fraîchement créé
+                $ticketId = $pdo->lastInsertId();
+
+                // 4. CRÉATION DE LA NOTIFICATION WEB (IN-APP)
+                if ($technicienId) {
+                    $msgNotif = "🤖 Nouveau ticket #T-{$ticketId} assigné d'office par l'IA (Catégorie: {$categorie_predite}).";
+                    // CORRECTION APPLIQUÉE : Ajout de ticket_id dans la requête et l'execute
+                    $stmtNotif = $pdo->prepare("INSERT INTO notifications (user_id, ticket_id, message, est_lu) VALUES (?, ?, ?, 0)");
+                    $stmtNotif->execute([$technicienId, $ticketId, $msgNotif]);
+                    
+                    // ... après $stmtNotif->execute([...]);
+
+                    if ($technicienId) {
+                        // 1. Récupérer l'email du technicien
+                        $stmtEmail = $pdo->prepare("SELECT email FROM users WHERE id = ?");
+                        $stmtEmail->execute([$technicienId]);
+                        $techEmail = $stmtEmail->fetchColumn();
+
+                        if ($techEmail) {
+                            // 2. Insérer dans la file d'attente (au lieu d'envoyer direct)
+                            $sujet = "Nouveau Ticket #T-{$ticketId} - IA Assignation";
+                            $contenu = "Bonjour, un nouveau ticket '{$titre}' a été détecté comme étant de catégorie '{$categorie_predite}'. Vous êtes assigné.";
+                            
+                            $stmtMail = $pdo->prepare("INSERT INTO mail_queue (ticket_id, destinataire_email, sujet, message) VALUES (?, ?, ?, ?)");
+                            $stmtMail->execute([$ticketId, $techEmail, $sujet, $contenu]);
+                        }
+                    }
+                }
+
+                // Réponse finale positive au frontend JS
+                echo json_encode(["status" => "success", "message" => "Ticket créé et assigné automatiquement."]);
+
+            } catch (Exception $e) {
+                // Intercepte toute erreur MySQL (comme la 1364) et la renvoie au frontend
+                http_response_code(500);
+                echo json_encode(["message" => "Erreur BDD : " . $e->getMessage()]);
+            }
         } else {
             http_response_code(405);
-            echo json_encode(["message" => "Méthode non autorisée."]);
+            echo json_encode(["message" => "Méthode non autorisée"]);
         }
         break;
 
