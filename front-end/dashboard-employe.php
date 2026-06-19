@@ -226,38 +226,47 @@ $catClasses = [
   </div>
 
   <script>
-    document.querySelector('.sbtn').addEventListener('click', async (e) => {
-      e.preventDefault();
+  document.querySelector('.sbtn').addEventListener('click', async (e) => {
+  e.preventDefault();
 
-      const obj = document.getElementById('tobj').value;
-      const desc = document.getElementById('tdesc2').value;
-      const prio = document.getElementById('tprio').value;
+  const btn = e.target;
+  const obj = document.getElementById('tobj').value;
+  const desc = document.getElementById('tdesc2').value;
+  const prio = document.getElementById('tprio').value;
 
-      if (!obj || !desc) {
-        alert("Veuillez remplir l'objet et la description.");
-        return;
-      }
+  if (!obj || !desc) {
+    alert("Veuillez remplir l'objet et la description.");
+    return;
+  }
 
-      try {
-        const response = await fetch('/projet/ticket/api/ticket/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ titre: obj, description: desc, priorite: prio })
-        });
+  // SÉCURITÉ ANTI-DOUBLON : Désactiver le bouton pendant le traitement
+  btn.disabled = true;
+  btn.innerText = "Analyse IA...";
 
-        const res = await response.json();
-        
-        if (response.ok) {
-          alert("Ticket créé avec succès !");
-          location.reload(); // Recharge la page PHP pour voir le nouveau ticket s'afficher en haut !
-        } else {
-          alert("Erreur : " + res.message);
-        }
-      } catch (err) {
-        alert("Impossible de joindre le serveur.");
-      }
+  try {
+    
+    const response = await fetch('/projet/ticket/api/ticket/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titre: obj, description: desc, priorite: prio })
     });
+
+    const res = await response.json();
+    console.log(res)
+    if (response.ok) {
+      alert("Ticket créé avec succès !");
+      location.reload(); 
+    } else {
+      alert("Erreur : " + res.message);
+      btn.disabled = false;
+      btn.innerText = "Soumettre le ticket";
+    }
+  } catch (err) {
+    alert("Impossible de joindre le serveur.");
+    btn.disabled = false;
+    btn.innerText = "Soumettre le ticket";
+  }
+});
   </script>
 </body>
-<script type="module" src="/projet/ticket/front-end/createTicket.js"></script>
 </html>
